@@ -1,12 +1,12 @@
 #
-# OMNeT++/OMNEST Makefile for Distributed
+# OMNeT++/OMNEST Makefile for DistributedNetowk
 #
 # This file was generated with the command:
 #  opp_makemake -f --deep
 #
 
 # Name of target to be created (-o option)
-TARGET = Distributed$(D)$(EXE_SUFFIX)
+TARGET = DistributedNetowk$(D)$(EXE_SUFFIX)
 TARGET_DIR = .
 
 # User interface (uncomment one) (-u option)
@@ -30,10 +30,11 @@ PROJECTRELATIVE_PATH = src
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc, .msg and .sm files
-OBJS = $O/Node.o
+OBJS = $O/Node.o $O/MyMessage_m.o
 
 # Message files
-MSGFILES =
+MSGFILES = \
+    MyMessage.msg
 
 # SM files
 SMFILES =
