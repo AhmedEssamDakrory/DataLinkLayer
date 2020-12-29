@@ -13,18 +13,24 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package distributed;
+//
+// TODO generated message class
+//
+cplusplus {{
+#include <bitset>
+typedef  std::bitset<8> bits;
+}}
+class noncobject bits;
 
-//
-// TODO auto-generated module
-//
-simple Node
-{
-    parameters:
-        double lambda = default(2.0);
-        int m = default(2); // number of bits needed for the sequence number.      
-        
-    gates:
-        input ins[];
-        output outs[];
+packet MyMessage {
+    @customize(true);  // see the generated C++ header for more info
+    int Seq_Num;
+    int ack;
+    int M_Type;
+    string M_Payload;
+    bits mycheckbits;
 }
+
+
+
+

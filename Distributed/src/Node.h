@@ -17,8 +17,14 @@
 #define __DISTRIBUTED_NODE_H_
 
 #include <omnetpp.h>
-
+#include "MyMessage_m.h"
 using namespace omnetpp;
+
+enum Events{
+    FrameArrival,
+    NetworkLayerReady,
+    Timeout
+};
 
 /**
  * TODO - Generated class
@@ -31,6 +37,23 @@ class Node : public cSimpleModule
     cMessage frame(cMessage *msg);
     cMessage unframe(cMessage *msg);
     bool correctErrors(cMessage *msg);
+
+    // GoBackN protocol parameters
+    int MAX_SEQ;
+    int next_frame_to_send;
+    int ack_expected;
+    int frame_expected;
+    int nbuffered;
+    char** buffer;
+
+    void initGoBackN();
+    void startGoBackN(MyMessage_Base* msg);
+    void sendData();
+    char* fromNetworkLayer();
+    void enableNetworkLayer();
+    int inc(int seq_num);
+    bool between(int a, int b, int c);
+    int getDest();
 };
 
 #endif
