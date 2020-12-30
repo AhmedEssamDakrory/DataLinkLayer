@@ -22,7 +22,31 @@ simple Node
 {
     parameters:
         double lambda = default(2.0);
-        int m = default(2); // number of bits needed for the sequence number.      
+        int m = default(2); // number of bits needed for the sequence number.  
+        
+        //framing parameters 
+        char flag = default('$');    
+        char ESC = default('/');
+        
+        //channel parameters    
+        double modification_min = default(0.0);
+        double modification_max = default(1.0);
+        int modification_presentage = default(30);
+        
+        double loss_min = default(0.0);
+        double loss_max = default(1.0);
+        int loss_presentage = default(30);
+        
+        double duplication_min = default(0.0);
+        double duplication_max = default(1.0);
+        int duplication_presentage = default(30);
+        
+        double delay_chance_min = default(0.0);
+        double delay_chance_max = default(1.0);
+        int delay_chance_presentage = default(30);
+        
+        double delay_duration_min = default(0.0);
+        double delay_duration_max = default(1.0);
         
     gates:
         input ins[];
