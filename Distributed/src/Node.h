@@ -18,6 +18,7 @@
 
 #include <omnetpp.h>
 #include "MyMessage_m.h"
+#include <bitset>
 using namespace omnetpp;
 
 enum Events{
@@ -34,8 +35,8 @@ class Node : public cSimpleModule
   protected:
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
-    cMessage frame(cMessage *msg);
-    cMessage unframe(cMessage *msg);
+    MyMessage_Base frame(char *msg);
+    char* unframe(MyMessage_Base mmsg);
     bool correctErrors(cMessage *msg);
 
     // GoBackN protocol parameters
@@ -54,6 +55,13 @@ class Node : public cSimpleModule
     int inc(int seq_num);
     bool between(int a, int b, int c);
     int getDest();
+
+    //channel effect handling methods
+    void toPhysicalLayer(MyMessage_Base* msg);
+    void modificationEffect(MyMessage_Base* msg);
+    void duplicateEffect(MyMessage_Base* msg);
+    void delaysEffect(MyMessage_Base* msg);
+    bool lossEffect();
 };
 
 #endif
