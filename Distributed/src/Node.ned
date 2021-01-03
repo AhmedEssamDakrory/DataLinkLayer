@@ -22,13 +22,15 @@ simple Node
 {
     parameters:
         double lambda = default(2.0);
+        double timeout_period = default(5);
         int m = default(2); // number of bits needed for the sequence number.  
         
         //framing parameters 
-        char flag = default('$');    
-        char ESC = default('/');
+        //char flag = default('$');    
+        //char ESC = default('/');
         
         //channel parameters    
+
         double modification_min = default(0.0);
         double modification_max = default(1.0);
         int modification_presentage = default(30);

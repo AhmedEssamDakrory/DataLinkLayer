@@ -483,7 +483,7 @@ std::string MyMessageDescriptor::getFieldValueAsString(void *object, int field, 
         case 1: return long2string(pp->getAck());
         case 2: return long2string(pp->getM_Type());
         case 3: return oppstring2string(pp->getM_Payload());
-        //case 4: {std::stringstream out; out << pp->getMycheckbits(); return out.str();}
+//        case 4: {std::stringstream out; out << pp->getMycheckbits(); return out.str();}
         default: return "";
     }
 }
