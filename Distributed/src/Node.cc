@@ -46,6 +46,11 @@ void Node::initGoBackN()
     int m = par("m");
     MAX_SEQ = (1 << m) -1; // window size should be less than (2^m)
     buffer = new char*[MAX_SEQ+1];
+    timers = new MyMessage_Base*[MAX_SEQ+1];
+    isTimerSet = new bool[MAX_SEQ+1];
+    for(int i = 0 ; i < MAX_SEQ+1; ++i){
+        isTimerSet[i] = 0;
+    }
 }
 
 char* Node::fromNetworkLayer()
@@ -53,6 +58,28 @@ char* Node::fromNetworkLayer()
     // dummy TODO:return random message
     char* message = "Hello there";
     return  message;
+}
+
+
+void Node::startTimer(int seq_num)
+{
+    MyMessage_Base * mmsg = new MyMessage_Base("");
+    mmsg->setM_Type(Timeout);
+    mmsg->setSeq_Num(seq_num);
+    scheduleAt(simTime() + par("timeout_period"), mmsg);
+    if(isTimerSet[seq_num]){
+        stopTimer(seq_num);
+    }
+    isTimerSet[seq_num] = 1;
+    timers[seq_num] = mmsg;
+}
+
+void Node::stopTimer(int seq_num)
+{
+    EV<<"Timer of seq_num = " << seq_num << " in node " << getIndex() <<" got cancelled!"<<endl;
+    cancelEvent(timers[seq_num]);
+    delete timers[seq_num];
+    isTimerSet[seq_num] = 0;
 }
 
 void Node::sendData()
@@ -63,9 +90,9 @@ void Node::sendData()
     mmsg->setSeq_Num(next_frame_to_send);
     mmsg->setM_Type(FrameArrival);
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
-    //send(mmsg, "outs", getDest()); // to physical layer
-    toPhysicalLayer(mmsg);
-    //TODO: start timer.
+    send(mmsg, "outs", getDest()); // to physical layer
+   // toPhysicalLayer(mmsg);
+    startTimer(next_frame_to_send);
 }
 
 void Node::enableNetworkLayer()
@@ -103,7 +130,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             // from physical layer
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
-                EV<<"Node" << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck()<<endl;
+                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck()<<endl;
             }
 
             // slide window while ack received in between ack_expected and next_frame_to_send
@@ -112,10 +139,12 @@ void Node::startGoBackN(MyMessage_Base* msg)
                 EV<<"slide window of Node" << getIndex() << "[ " << ack_expected << ", " << next_frame_to_send <<" ]" <<endl;
                 --nbuffered;
                 // TODO: Stop timer of ack_expected.
+                stopTimer(ack_expected);
                 ack_expected = inc(ack_expected);
             }
             break;
         case Timeout:
+            EV << "Timeout on frame " << msg->getSeq_Num() << " in node " << getIndex()<<endl;
             next_frame_to_send = ack_expected;
             for(int i = 0; i < nbuffered; ++i){
                 sendData();
@@ -136,12 +165,12 @@ void Node::startGoBackN(MyMessage_Base* msg)
  *
  */
 
-MyMessage_Base Node::frame(char *msg ){
-    MyMessage_Base mmsg("") ;
+void Node::frameWithByteStuffing(MyMessage_Base* mmsg){
+    const char *msg = mmsg->getM_Payload();
     std::string payLoad = "";
     const char* flag = par("Flag").stringValue();
     const char* ESC = par("ESC").stringValue();
-    for(int i = 0;i<strlen(msg);i++){
+    for(int i = 0;i< (int) strlen(msg);i++){
         if(msg[i] == *flag || msg[i] == *ESC){
             payLoad.push_back(par("ESC"));
             payLoad.push_back(msg[i]);
@@ -153,19 +182,18 @@ MyMessage_Base Node::frame(char *msg ){
 
     char* c_payLoad = new char[payLoad.size()];
     std::strcpy(c_payLoad, payLoad.c_str());
-    mmsg.setM_Payload(c_payLoad);
-    return mmsg;
+    mmsg->setM_Payload(c_payLoad);
 }
 
 /*
  * this function make a frame using byte stuffing with :
  *
  */
-char* Node::unframe(MyMessage_Base mmsg){
+char* Node::unframe(MyMessage_Base* mmsg){
    std::string msg = "";
-   const char* received_msg = mmsg.getM_Payload();
+   const char* received_msg = mmsg->getM_Payload();
    const char* ESC = par("ESC").stringValue();
-   for(int i = 1 ; i < strlen(received_msg) - 1; i++){
+   for(int i = 1 ; i < (int) strlen(received_msg) - 1; i++){
        if(received_msg[i] == *ESC){
            msg.push_back(received_msg[++i]);
        }else{

@@ -1,12 +1,12 @@
 #
-# OMNeT++/OMNEST Makefile for Distributed
+# OMNeT++/OMNEST Makefile for DistributedNetwork2
 #
 # This file was generated with the command:
 #  opp_makemake -f --deep
 #
 
 # Name of target to be created (-o option)
-TARGET = Distributed$(D)$(EXE_SUFFIX)
+TARGET = DistributedNetwork2$(D)$(EXE_SUFFIX)
 TARGET_DIR = .
 
 # User interface (uncomment one) (-u option)

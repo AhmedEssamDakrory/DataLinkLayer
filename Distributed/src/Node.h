@@ -35,8 +35,8 @@ class Node : public cSimpleModule
   protected:
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
-    MyMessage_Base frame(char *msg);
-    char* unframe(MyMessage_Base mmsg);
+    void frameWithByteStuffing(MyMessage_Base* mmsg);
+    char* unframe(MyMessage_Base* mmsg);
     bool correctErrors(cMessage *msg);
 
     // GoBackN protocol parameters
@@ -46,6 +46,8 @@ class Node : public cSimpleModule
     int frame_expected;
     int nbuffered;
     char** buffer;
+    MyMessage_Base** timers;
+    bool* isTimerSet;
 
     void initGoBackN();
     void startGoBackN(MyMessage_Base* msg);
@@ -54,6 +56,8 @@ class Node : public cSimpleModule
     void enableNetworkLayer();
     int inc(int seq_num);
     bool between(int a, int b, int c);
+    void startTimer(int seq_num);
+    void stopTimer(int seq_num);
     int getDest();
 
     //channel effect handling methods
