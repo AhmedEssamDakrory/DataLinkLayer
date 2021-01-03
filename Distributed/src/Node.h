@@ -63,7 +63,7 @@ class Node : public cSimpleModule
     //channel effect handling methods
     void toPhysicalLayer(MyMessage_Base* msg);
     void modificationEffect(MyMessage_Base* msg);
-    void duplicateEffect(MyMessage_Base* msg);
+    bool duplicateEffect(MyMessage_Base* msg);
     void delaysEffect(MyMessage_Base* msg);
     bool lossEffect();
 };

@@ -26,8 +26,8 @@ simple Node
         int m = default(2); // number of bits needed for the sequence number.  
         
         //framing parameters 
-        //char flag = default('$');    
-        //char ESC = default('/');
+        int flag = default(36); // acsci of $    
+        int ESC = default(47); // asci of /
         
         //channel parameters    
 
@@ -41,11 +41,11 @@ simple Node
         
         double duplication_min = default(0.0);
         double duplication_max = default(1.0);
-        int duplication_presentage = default(30);
+        int duplication_presentage = default(20);
         
         double delay_chance_min = default(0.0);
         double delay_chance_max = default(1.0);
-        int delay_chance_presentage = default(30);
+        int delay_chance_presentage = default(20);
         
         double delay_duration_min = default(0.0);
         double delay_duration_max = default(1.0);
