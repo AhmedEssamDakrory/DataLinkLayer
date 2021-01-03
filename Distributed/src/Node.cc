@@ -90,8 +90,8 @@ void Node::sendData()
     mmsg->setSeq_Num(next_frame_to_send);
     mmsg->setM_Type(FrameArrival);
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
-    send(mmsg, "outs", getDest()); // to physical layer
-   // toPhysicalLayer(mmsg);
+//    send(mmsg, "outs", getDest()); // to physical layer
+    toPhysicalLayer(mmsg);
     startTimer(next_frame_to_send);
 }
 
@@ -131,6 +131,9 @@ void Node::startGoBackN(MyMessage_Base* msg)
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
                 EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck()<<endl;
+            } else {
+                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and discarded it!"<<endl;
+
             }
 
             // slide window while ack received in between ack_expected and next_frame_to_send
@@ -168,17 +171,17 @@ void Node::startGoBackN(MyMessage_Base* msg)
 void Node::frameWithByteStuffing(MyMessage_Base* mmsg){
     const char *msg = mmsg->getM_Payload();
     std::string payLoad = "";
-    const char* flag = par("Flag").stringValue();
-    const char* ESC = par("ESC").stringValue();
-    for(int i = 0;i< (int) strlen(msg);i++){
-        if(msg[i] == *flag || msg[i] == *ESC){
-            payLoad.push_back(par("ESC"));
+    char flag = char(par("Flag"));
+    char ESC = char(par("ESC"));
+    for(int i = 0;i < (int) strlen(msg);i++){
+        if(msg[i] == flag || msg[i] == ESC){
+            payLoad.push_back(ESC);
             payLoad.push_back(msg[i]);
         }else{
             payLoad.push_back(msg[i]);
         }
     }
-    payLoad = "$"+payLoad+"$";
+    payLoad = flag + payLoad + flag;
 
     char* c_payLoad = new char[payLoad.size()];
     std::strcpy(c_payLoad, payLoad.c_str());
@@ -213,9 +216,16 @@ char* Node::unframe(MyMessage_Base* mmsg){
 void Node::toPhysicalLayer(MyMessage_Base* msg){
     bool lost = lossEffect();
     if(!lost){
-        duplicateEffect(msg);
+        bool dublicate = duplicateEffect(msg);
+        if(dublicate){
+            MyMessage_Base* mssg = msg->dup();
+            modificationEffect(mssg);
+            delaysEffect(mssg);
+        }
         modificationEffect(msg);
         delaysEffect(msg);
+    } else {
+        EV<<"Frame" << msg->getSeq_Num()<< " sent from Node" << getIndex() << " is lost!!!"<<endl;
     }
 }
 /*
@@ -224,22 +234,19 @@ void Node::toPhysicalLayer(MyMessage_Base* msg){
 void Node::modificationEffect(MyMessage_Base* msg){
     int rand = uniform(par("modification_min").doubleValue(),par("modification_max").doubleValue())*100;
     if(par("modification_presentage").intValue()>=rand){
-        int position_bit = uniform(0,(strlen(msg->getM_Payload())*8) - 1);
-        int position_char = position_bit / 8;
+        int position_char = uniform(0, strlen(msg->getM_Payload()));
         const char * old_msg = msg->getM_Payload();
         int n = strlen(old_msg);
-        char* m_msg =new char[n];
+        char* m_msg = new char[n];
         std::strcpy(m_msg, old_msg);
 
         std::bitset<8> bits(m_msg[position_char]);
-        bits[position_bit] = ~bits[position_bit];
 
-        m_msg[position_char] = *(bits.to_string().c_str());
+        int position_bit = uniform(0, 8);
+        bits[position_bit] = ~ bits[position_bit];
+
+        m_msg[position_char] = (char) bits.to_ulong();
         msg->setM_Payload(m_msg);
-        EV<<"frame is modified at bit position : "<< position_bit <<endl;
-        EV<<"frame is modified at char position : "<< position_char <<endl;
-        EV<<old_msg[position_char]<< " --> " <<m_msg[position_char]<<endl;
-
     }
 
 
@@ -248,18 +255,13 @@ void Node::modificationEffect(MyMessage_Base* msg){
 /*
  * this function is used to simulate the duplication effect
  */
-void Node::duplicateEffect(MyMessage_Base* msg){
+bool Node::duplicateEffect(MyMessage_Base* msg){
     int rand = uniform(par("duplication_min").doubleValue(),par("duplication_max").doubleValue())*100;
     if(par("duplication_presentage").intValue()>=rand){
-       EV<<"frame is duplicated !!!"<<endl;
-       const char * old_msg = msg->getM_Payload();
-       int n = 2*strlen(old_msg);
-       char* d_msg =new char[n];
-       for(int i = 0 ; i < n;i++){
-           d_msg[i] = old_msg[i%(n/2)];
-       }
-       msg->setM_Payload(d_msg);
+        EV<<"Frame" << msg->getSeq_Num()<< " sent from Node" << getIndex() << " is duplicated !!!"<<endl;
+        return true;
     }
+    return false;
 }
 /*
  * this function is used to simulate the loss effect of the message
@@ -271,7 +273,6 @@ bool Node::lossEffect(){
     int rand = uniform(par("loss_min").doubleValue(),par("loss_max").doubleValue())*100;
     if(par("loss_presentage").intValue()>=rand){
        result = true;
-       EV<<"frame is lost !!!"<<endl;
     }
     return result;
 }
@@ -283,9 +284,9 @@ void Node::delaysEffect(MyMessage_Base* msg){
 
     int rand = uniform(par("delay_chance_min").doubleValue(),par("delay_chance_max").doubleValue())*100;
     if(par("delay_chance_presentage").intValue()>=rand){
-        EV<<"frame is delayed !!!"<<endl;
+        EV<<"Frame" << msg->getSeq_Num()<< " sent from Node " << getIndex() << " is delayed !!!"<<endl;
         double rand_time = uniform(par("delay_duration_min").doubleValue(),par("delay_duration_max").doubleValue());
-        sendDelayed(msg,rand_time,"out",getDest());
+        sendDelayed(msg,rand_time,"outs",getDest());
      }else{
         send(msg, "outs", getDest());
      }
