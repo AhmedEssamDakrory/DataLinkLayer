@@ -83,7 +83,6 @@ class MyMessage_Base : public ::omnetpp::cPacket
 
   public:
     MyMessage_Base(const char *name=nullptr, short kind=0);
-
     virtual ~MyMessage_Base();
     virtual MyMessage_Base *dup() const override {return new MyMessage_Base(*this);}
     virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
