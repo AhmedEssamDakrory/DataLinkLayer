@@ -14,6 +14,7 @@
 // 
 
 #include "Node.h"
+#include <fstream>
 Define_Module(Node);
 
 void Node::initialize()
@@ -27,6 +28,8 @@ void Node::handleMessage(cMessage *msg)
     MyMessage_Base *mmsg = check_and_cast<MyMessage_Base *>(msg);
     if(mmsg->getM_Type() == INIT){
         std::cout << getIndex() <<" --> " << mmsg->getAck()  <<endl;
+        //resetting start time
+        lastResetTime = msg->getTimestamp();
         // initializing the destination node.
         dest = mmsg->getAck();
         if(dest > getIndex()) --dest;
@@ -34,7 +37,14 @@ void Node::handleMessage(cMessage *msg)
         enableNetworkLayer();
 
     } else {
-        startGoBackN(mmsg);
+        const simtime_t  messageCreatedAt = mmsg->getTimestamp();
+        std::cout<<"Node "<<getIndex()<<endl;
+        std::cout << messageCreatedAt << "--" << lastResetTime << endl;
+        if(messageCreatedAt >= lastResetTime){
+            startGoBackN(mmsg);
+        } else{
+            EV<<"Ignore messages from last time step" << endl;
+        }
     }
 
 }
@@ -91,6 +101,7 @@ void Node::sendData()
     mmsg->setSeq_Num(next_frame_to_send);
     mmsg->setM_Type(FrameArrival);
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
+    mmsg->setTimestamp();
     // Frame with Byte Stuffing.
     frameWithByteStuffing(mmsg);
     // TODO: Hamming
@@ -103,6 +114,7 @@ void Node::enableNetworkLayer()
 {
     MyMessage_Base * mmsg = new MyMessage_Base("");
     mmsg->setM_Type(NetworkLayerReady);
+    mmsg->setTimestamp();
     double interval = exponential(1 / par("lambda").doubleValue());
     scheduleAt(simTime() + interval, mmsg);
 }
@@ -141,7 +153,6 @@ void Node::startGoBackN(MyMessage_Base* msg)
             }
 
             // slide window while ack received in between ack_expected and next_frame_to_send
-            std::cout<<msg->getAck()<<endl;
             while(between(ack_expected, msg->getAck(), next_frame_to_send)){
                 --nbuffered;
                 // TODO: Stop timer of ack_expected.

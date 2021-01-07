@@ -50,6 +50,7 @@ class Node : public cSimpleModule
     const char** buffer;
     MyMessage_Base** timers;
     bool* isTimerSet;
+    omnetpp::simtime_t  lastResetTime;
 
 
     void initGoBackN();

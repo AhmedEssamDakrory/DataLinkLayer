@@ -23,26 +23,29 @@ Define_Module(Initializer);
 void Initializer::initialize()
 {
     MyMessage_Base* msg = new MyMessage_Base("");
-    scheduleAt(simTime() + 5 , msg);
+    scheduleAt(simTime(), msg);
 }
 
 void Initializer::handleMessage(cMessage *msg)
 {
     if(msg->isSelfMessage()){
-        // TODO: Clear old messages.
         generateRandomPairs();
         // TODO: schedule self message after 30 seconds.
+        MyMessage_Base* msg = new MyMessage_Base("");
+        scheduleAt(simTime()+par("timeStep"), msg);
     }
 }
 
 void Initializer::generateRandomPairs()
 {
+    EV<<"Resetting......"<<endl;
     std::vector<int> nodes;
     int n = gateSize("outs");
     for(int i = 0 ; i < n ; ++i) {
         nodes.push_back(i);
     }
 
+    simtime_t resetTime = simTime();
     while((int) nodes.size() > 1){
         int p1 = nodes[0];
         nodes.erase(nodes.begin());
@@ -55,6 +58,8 @@ void Initializer::generateRandomPairs()
         msg2->setM_Type(INIT);
         msg1->setAck(p2);
         msg2->setAck(p1);
+        msg1->setTimestamp(resetTime);
+        msg2->setTimestamp(resetTime);
         send(msg1, "outs", p1);
         send(msg2, "outs", p2);
     }

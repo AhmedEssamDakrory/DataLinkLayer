@@ -20,6 +20,8 @@ package distributed;
 //
 simple Initializer
 {
+    parameters:
+        double timeStep = default(30);
     gates:
         output outs[];
 }
