@@ -1,4 +1,4 @@
 #!/bin/sh
 cd `dirname $0`
-../src/distributednetowk -n .:../src $*
-# for shared lib, use: opp_run -l ../src/distributednetowk -n .:../src $*
+../src/distributednetwork3 -n .:../src $*
+# for shared lib, use: opp_run -l ../src/distributednetwork3 -n .:../src $*

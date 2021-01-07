@@ -24,7 +24,8 @@ using namespace omnetpp;
 enum Events{
     FrameArrival,
     NetworkLayerReady,
-    Timeout
+    Timeout,
+    INIT
 };
 
 /**
@@ -40,25 +41,26 @@ class Node : public cSimpleModule
     bool correctErrors(cMessage *msg);
 
     // GoBackN protocol parameters
+    int dest;
     int MAX_SEQ;
     int next_frame_to_send;
     int ack_expected;
     int frame_expected;
     int nbuffered;
-    char** buffer;
+    const char** buffer;
     MyMessage_Base** timers;
     bool* isTimerSet;
+
 
     void initGoBackN();
     void startGoBackN(MyMessage_Base* msg);
     void sendData();
-    char* fromNetworkLayer();
+    const char* fromNetworkLayer();
     void enableNetworkLayer();
     int inc(int seq_num);
     bool between(int a, int b, int c);
     void startTimer(int seq_num);
     void stopTimer(int seq_num);
-    int getDest();
 
     //channel effect handling methods
     void toPhysicalLayer(MyMessage_Base* msg);
