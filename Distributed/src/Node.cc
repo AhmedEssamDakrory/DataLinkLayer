@@ -251,18 +251,20 @@ void Node::toPhysicalLayer(MyMessage_Base* msg){
 void Node::modificationEffect(MyMessage_Base* msg){
     int rand = uniform(par("modification_min").doubleValue(),par("modification_max").doubleValue())*100;
     if(par("modification_presentage").intValue()>=rand){
-        int position_char = uniform(0, strlen(msg->getM_Payload()));
         const char * old_msg = msg->getM_Payload();
         int n = strlen(old_msg);
+        int position_char = uniform(0, n);
         char* m_msg = new char[n];
         std::strcpy(m_msg, old_msg);
 
-        std::bitset<8> bits(m_msg[position_char]);
-
-        int position_bit = uniform(0, 8);
-        bits[position_bit] = ~ bits[position_bit];
-
-        m_msg[position_char] = (char) bits.to_ulong();
+        if(m_msg[position_char]=='1') m_msg[position_char]='0';
+        else m_msg[position_char]='1';
+//        std::bitset<8> bits(m_msg[position_char]);
+//
+//        int position_bit = uniform(0, 8);
+//        bits[position_bit] = ~ bits[position_bit];
+//
+//        m_msg[position_char] = (char) bits.to_ulong();
         EV<<"char in position " << position_char << " changed from " << old_msg[position_char] << " to " << m_msg[position_char] << endl;
         msg->setM_Payload(m_msg);
     }
@@ -322,9 +324,12 @@ std::string Node::binarize(std::string s) {
 
 std::string Node::characterize(std::string s) {
     std::string out = "";
+    std::cout << s << endl;
     for(int i=0;i<s.length()/8;i++) {
+        std::cout << s.substr(i*8, 8) << " ";
         out += static_cast<char>(std::bitset<8>(s.substr(i*8, 8)).to_ulong());
     }
+    std::cout << endl;
     return out;
 }
 
