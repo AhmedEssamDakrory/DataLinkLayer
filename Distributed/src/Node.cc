@@ -14,12 +14,11 @@
 // 
 
 #include "Node.h"
+#include <fstream>
 Define_Module(Node);
 
 void Node::initialize()
 {
-    initGoBackN();
-    enableNetworkLayer();
 }
 
 
@@ -27,14 +26,27 @@ void Node::initialize()
 void Node::handleMessage(cMessage *msg)
 {
     MyMessage_Base *mmsg = check_and_cast<MyMessage_Base *>(msg);
-    startGoBackN(mmsg);
-}
+    if(mmsg->getM_Type() == INIT){
+        std::cout << getIndex() <<" --> " << mmsg->getAck()  <<endl;
+        //resetting start time
+        lastResetTime = msg->getTimestamp();
+        // initializing the destination node.
+        dest = mmsg->getAck();
+        if(dest > getIndex()) --dest;
+        initGoBackN();
+        enableNetworkLayer();
 
-int Node::getDest()
-{
-    int dest = getIndex();
-    if(dest % 2 != 0) --dest;
-    return dest;
+    } else {
+        const simtime_t  messageCreatedAt = mmsg->getTimestamp();
+        std::cout<<"Node "<<getIndex()<<endl;
+        std::cout << messageCreatedAt << "--" << lastResetTime << endl;
+        if(messageCreatedAt >= lastResetTime){
+            startGoBackN(mmsg);
+        } else{
+            EV<<"Ignore messages from last time step" << endl;
+        }
+    }
+
 }
 
 void Node::initGoBackN()
@@ -45,7 +57,7 @@ void Node::initGoBackN()
     nbuffered = 0;
     int m = par("m");
     MAX_SEQ = (1 << m) -1; // window size should be less than (2^m)
-    buffer = new char*[MAX_SEQ+1];
+    buffer = new const char*[MAX_SEQ+1];
     timers = new MyMessage_Base*[MAX_SEQ+1];
     isTimerSet = new bool[MAX_SEQ+1];
     for(int i = 0 ; i < MAX_SEQ+1; ++i){
@@ -53,10 +65,10 @@ void Node::initGoBackN()
     }
 }
 
-char* Node::fromNetworkLayer()
+const char* Node::fromNetworkLayer()
 {
-    // dummy TODO:return random message
-    char* message = "Hello there";
+    //TODO: return random message
+    const char* message = "hello $//there//";
     return  message;
 }
 
@@ -84,25 +96,26 @@ void Node::stopTimer(int seq_num)
 
 void Node::sendData()
 {
-    // TODO: Framing and Hamming code
     MyMessage_Base * mmsg = new MyMessage_Base("");
     mmsg->setM_Payload(buffer[next_frame_to_send]);
     mmsg->setSeq_Num(next_frame_to_send);
     mmsg->setM_Type(FrameArrival);
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
-
+    mmsg->setTimestamp();
+    // Frame with Byte Stuffing.
+    frameWithByteStuffing(mmsg);
+    // TODO: Hamming
     addHamming(mmsg);
-//    send(mmsg, "outs", getDest()); // to physical layer
     toPhysicalLayer(mmsg);
+    EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << " and payload = " << mmsg->getM_Payload() << endl;
     startTimer(next_frame_to_send);
 }
 
 void Node::enableNetworkLayer()
 {
-    // TODO: generate event with probability
-
     MyMessage_Base * mmsg = new MyMessage_Base("");
     mmsg->setM_Type(NetworkLayerReady);
+    mmsg->setTimestamp();
     double interval = exponential(1 / par("lambda").doubleValue());
     scheduleAt(simTime() + interval, mmsg);
 }
@@ -122,30 +135,32 @@ void Node::startGoBackN(MyMessage_Base* msg)
     int event = msg->getM_Type();
     switch(event){
         case NetworkLayerReady:
-            EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << endl;
-            buffer[next_frame_to_send] = fromNetworkLayer();
-            ++nbuffered;
-            sendData();
-            next_frame_to_send = inc(next_frame_to_send);
+            if(nbuffered < MAX_SEQ){
+                buffer[next_frame_to_send] = fromNetworkLayer();
+                ++nbuffered;
+                sendData();
+                next_frame_to_send = inc(next_frame_to_send);
+            }
             break;
         case FrameArrival:
             // from physical layer
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
-                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck()<<endl;
+                correctErrors(msg);
+                char* message = unframe(msg);
+                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck() << " and payload = " << message << endl;
             } else {
                 EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and discarded it!"<<endl;
 
             }
 
             // slide window while ack received in between ack_expected and next_frame_to_send
-            std::cout<<msg->getAck()<<endl;
             while(between(ack_expected, msg->getAck(), next_frame_to_send)){
-                EV<<"slide window of Node" << getIndex() << "[ " << ack_expected << ", " << next_frame_to_send <<" ]" <<endl;
                 --nbuffered;
                 // TODO: Stop timer of ack_expected.
                 stopTimer(ack_expected);
                 ack_expected = inc(ack_expected);
+                EV<<"slide window of Node" << getIndex() << "[ " << ack_expected << ", " << next_frame_to_send <<" ]" <<endl;
             }
             break;
         case Timeout:
@@ -153,7 +168,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             next_frame_to_send = ack_expected;
             for(int i = 0; i < nbuffered; ++i){
                 sendData();
-                inc(next_frame_to_send);
+                next_frame_to_send = inc(next_frame_to_send);
             }
             break;
     }
@@ -197,9 +212,9 @@ void Node::frameWithByteStuffing(MyMessage_Base* mmsg){
 char* Node::unframe(MyMessage_Base* mmsg){
    std::string msg = "";
    const char* received_msg = mmsg->getM_Payload();
-   const char* ESC = par("ESC").stringValue();
+   char ESC = char(par("ESC"));
    for(int i = 1 ; i < (int) strlen(received_msg) - 1; i++){
-       if(received_msg[i] == *ESC){
+       if(received_msg[i] == ESC){
            msg.push_back(received_msg[++i]);
        }else{
            msg.push_back(received_msg[i]);
@@ -248,11 +263,9 @@ void Node::modificationEffect(MyMessage_Base* msg){
         bits[position_bit] = ~ bits[position_bit];
 
         m_msg[position_char] = (char) bits.to_ulong();
+        EV<<"char in position " << position_char << " changed from " << old_msg[position_char] << " to " << m_msg[position_char] << endl;
         msg->setM_Payload(m_msg);
     }
-
-
-
 }
 /*
  * this function is used to simulate the duplication effect
@@ -288,9 +301,9 @@ void Node::delaysEffect(MyMessage_Base* msg){
     if(par("delay_chance_presentage").intValue()>=rand){
         EV<<"Frame" << msg->getSeq_Num()<< " sent from Node " << getIndex() << " is delayed !!!"<<endl;
         double rand_time = uniform(par("delay_duration_min").doubleValue(),par("delay_duration_max").doubleValue());
-        sendDelayed(msg,rand_time,"outs",getDest());
+        sendDelayed(msg,rand_time,"outs",dest);
      }else{
-        send(msg, "outs", getDest());
+        send(msg, "outs", dest);
      }
 
 }

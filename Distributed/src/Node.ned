@@ -26,7 +26,7 @@ simple Node
         int m = default(2); // number of bits needed for the sequence number.  
         
         //framing parameters 
-        int flag = default(36); // acsci of $    
+        int Flag = default(36); // acsci of $    
         int ESC = default(47); // asci of /
         
         //channel parameters    
@@ -51,6 +51,7 @@ simple Node
         double delay_duration_max = default(1.0);
         
     gates:
+        input fromInitializer;
         input ins[];
         output outs[];
 }
