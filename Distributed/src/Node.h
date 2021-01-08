@@ -19,6 +19,7 @@
 #include <omnetpp.h>
 #include "MyMessage_m.h"
 #include <bitset>
+#include <string>
 using namespace omnetpp;
 
 enum Events{
@@ -37,7 +38,11 @@ class Node : public cSimpleModule
     virtual void handleMessage(cMessage *msg);
     void frameWithByteStuffing(MyMessage_Base* mmsg);
     char* unframe(MyMessage_Base* mmsg);
-    bool correctErrors(cMessage *msg);
+    bool correctErrors(MyMessage_Base *mmsg);
+    void addHamming(MyMessage_Base *mmsg);
+    bool isPowerOfTwo(int x);
+    std::string binarize(std::string s);
+    std::string characterize(std::string s);
 
     // GoBackN protocol parameters
     int MAX_SEQ;

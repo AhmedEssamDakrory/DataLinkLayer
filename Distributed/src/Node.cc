@@ -90,6 +90,8 @@ void Node::sendData()
     mmsg->setSeq_Num(next_frame_to_send);
     mmsg->setM_Type(FrameArrival);
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
+
+    addHamming(mmsg);
 //    send(mmsg, "outs", getDest()); // to physical layer
     toPhysicalLayer(mmsg);
     startTimer(next_frame_to_send);
@@ -291,5 +293,89 @@ void Node::delaysEffect(MyMessage_Base* msg){
         send(msg, "outs", getDest());
      }
 
+}
+
+bool Node::isPowerOfTwo(int x) {
+    return (x != 0) && ((x & (x - 1)) == 0);
+}
+
+std::string Node::binarize(std::string s) {
+    std::string out = "";
+    for(int i=0;i<s.length();i++) {
+        out += std::bitset<8>(s[i]).to_string();
+    }
+    return out;
+}
+
+std::string Node::characterize(std::string s) {
+    std::string out = "";
+    for(int i=0;i<s.length()/8;i++) {
+        out += static_cast<char>(std::bitset<8>(s.substr(i*8, 8)).to_ulong());
+    }
+    return out;
+}
+
+void Node::addHamming(MyMessage_Base *mmsg){
+    std::string msg = mmsg->getM_Payload();
+    msg = binarize(msg);
+    int m = msg.length();
+
+    // calculating r
+    int r = floor(log2(m+1))+1;
+    while(pow(2,r) <= m+r+1) r++;
+
+    // initializing outputMsg
+    std::string outputMsg = "";
+    int k=0;
+    for(int i=1; i<=m+r; i++) {
+        if(!isPowerOfTwo(i)) outputMsg+=msg[k++];
+        else outputMsg+=" ";
+    }
+
+    // calculating parity bits
+    for(int i=0; i<r; i++) {
+        int p = 0;
+        for(int j=1; j<=m+r; j++) {
+            if(!isPowerOfTwo(j) && (j&(int)pow(2, i))) {
+                p^=(outputMsg[j-1]&1);
+            }
+        }
+        outputMsg[pow(2, i)-1] = p+48;
+    }
+
+    mmsg->setM_Payload(outputMsg.c_str());
+}
+
+
+bool Node::correctErrors(MyMessage_Base *mmsg){
+    std::string msg = mmsg->getM_Payload();
+    int n = msg.length();
+    int r = ceil(log2(n+1));
+
+    int error = 0;
+    for(int i=0; i<r; i++) {
+        int p = 0;
+        for(int j=1; j<=n; j++) {
+            if(!isPowerOfTwo(j) && (j&(int)pow(2, i))) {
+                p^=(msg[j-1]&1);
+            }
+        }
+        if((char)p+48 != msg[pow(2, i)-1]) {
+            error |= (int)pow(2, i);
+        }
+    }
+    std::cout << "error detected at " << error << endl;
+    if(error) {
+        int e = msg[error-1] - '0';
+        if(e) msg[error-1] = '0';
+        else msg[error-1] = '1';
+    }
+    std::string correctedMsg = "";
+    for(int i=1; i<=n; i++) {
+        if(!isPowerOfTwo(i)) correctedMsg+=msg[i-1];
+    }
+
+    correctedMsg = characterize(correctedMsg);
+    mmsg->setM_Payload(correctedMsg.c_str());
 }
 
