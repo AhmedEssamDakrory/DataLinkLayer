@@ -21,6 +21,9 @@ Define_Module(Node);
 int Node::dropped_frames = 0;
 int Node::generated_frames = 0;
 int Node::retransmitted_frames = 0;
+int Node::duplicated_frames = 0;
+int Node::useful_frames = 0;
+bool Node::printed = false;
 
 void Node::initialize()
 {
@@ -43,6 +46,15 @@ void Node::initialize()
 
 void Node::handleMessage(cMessage *msg)
 {
+    // end time
+    if(simTime() >= par("end_time")){
+        if(!printed && getIndex() == 0){
+            printStatistics();
+            printed = true;
+        }
+        return;
+    }
+
     MyMessage_Base *mmsg = check_and_cast<MyMessage_Base *>(msg);
     if(mmsg->getM_Type() == INIT){
         std::cout << getIndex() <<" --> " << mmsg->getAck()  <<endl;
@@ -56,8 +68,6 @@ void Node::handleMessage(cMessage *msg)
 
     } else {
         const simtime_t  messageCreatedAt = mmsg->getTimestamp();
-        std::cout<<"Node "<<getIndex()<<endl;
-        std::cout << messageCreatedAt << "--" << lastResetTime << endl;
         if(messageCreatedAt >= lastResetTime){
             startGoBackN(mmsg);
         } else{
@@ -115,7 +125,7 @@ void Node::stopTimer(int seq_num)
     isTimerSet[seq_num] = 0;
 }
 
-void Node::sendData()
+void Node::sendData(bool retransmitted)
 {
     MyMessage_Base * mmsg = new MyMessage_Base("");
     mmsg->setM_Payload(buffer[next_frame_to_send]);
@@ -124,11 +134,11 @@ void Node::sendData()
     mmsg->setAck((frame_expected+MAX_SEQ)%(MAX_SEQ+1)); // Ack contains the number of the last frame received.
     mmsg->setTimestamp();
     // Frame with Byte Stuffing.
+    EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << " and payload = " << mmsg->getM_Payload() << endl;
     frameWithByteStuffing(mmsg);
     // TODO: Hamming
-//    addHamming(mmsg);
-    toPhysicalLayer(mmsg);
-    EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << " and payload = " << mmsg->getM_Payload() << endl;
+    addHamming(mmsg);
+    toPhysicalLayer(mmsg, retransmitted);
     startTimer(next_frame_to_send);
 }
 
@@ -159,7 +169,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             if(nbuffered < MAX_SEQ){
                 buffer[next_frame_to_send] = fromNetworkLayer();
                 ++nbuffered;
-                sendData();
+                sendData(false);
                 next_frame_to_send = inc(next_frame_to_send);
             }
             break;
@@ -167,7 +177,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             // from physical layer
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
-//                correctErrors(msg);
+                correctErrors(msg);
                 char* message = unframe(msg);
                 EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck() << " and payload = " << message << endl;
             } else {
@@ -188,7 +198,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             EV << "Timeout on frame " << msg->getSeq_Num() << " in node " << getIndex()<<endl;
             next_frame_to_send = ack_expected;
             for(int i = 0; i < nbuffered; ++i){
-                sendData();
+                sendData(true);
                 next_frame_to_send = inc(next_frame_to_send);
             }
             break;
@@ -251,11 +261,16 @@ char* Node::unframe(MyMessage_Base* mmsg){
 /*
  * this function is used to send the message
  */
-void Node::toPhysicalLayer(MyMessage_Base* msg){
+void Node::toPhysicalLayer(MyMessage_Base* msg, bool retransmitted){
+    generated_frames++;
     bool lost = lossEffect();
+    if(retransmitted) retransmitted_frames++;
     if(!lost){
+        if(!retransmitted) useful_frames++;
         bool dublicate = duplicateEffect(msg);
         if(dublicate){
+            generated_frames++;
+            duplicated_frames++;
             MyMessage_Base* mssg = msg->dup();
             modificationEffect(mssg);
             delaysEffect(mssg);
@@ -263,6 +278,7 @@ void Node::toPhysicalLayer(MyMessage_Base* msg){
         modificationEffect(msg);
         delaysEffect(msg);
     } else {
+        dropped_frames++;
         EV<<"Frame" << msg->getSeq_Num()<< " sent from Node" << getIndex() << " is lost!!!"<<endl;
     }
 }
@@ -280,12 +296,7 @@ void Node::modificationEffect(MyMessage_Base* msg){
 
         if(m_msg[position_char]=='1') m_msg[position_char]='0';
         else m_msg[position_char]='1';
-//        std::bitset<8> bits(m_msg[position_char]);
-//
-//        int position_bit = uniform(0, 8);
-//        bits[position_bit] = ~ bits[position_bit];
-//
-//        m_msg[position_char] = (char) bits.to_ulong();
+
         EV<<"char in position " << position_char << " changed from " << old_msg[position_char] << " to " << m_msg[position_char] << endl;
         msg->setM_Payload(m_msg);
     }
@@ -337,7 +348,7 @@ bool Node::isPowerOfTwo(int x) {
 
 std::string Node::binarize(std::string s) {
     std::string out = "";
-    for(int i=0;i<s.length();i++) {
+    for(int i=0;i<int(s.length());i++) {
         out += std::bitset<8>(s[i]).to_string();
     }
     return out;
@@ -345,12 +356,9 @@ std::string Node::binarize(std::string s) {
 
 std::string Node::characterize(std::string s) {
     std::string out = "";
-//    std::cout << s << endl;
-    for(int i=0;i<s.length()/8;i++) {
-//        std::cout << s.substr(i*8, 8) << " ";
+    for(int i=0;i<int(s.length()/8);i++) {
         out += static_cast<char>(std::bitset<8>(s.substr(i*8, 8)).to_ulong());
     }
-//    std::cout << endl;
     return out;
 }
 
@@ -386,7 +394,7 @@ void Node::addHamming(MyMessage_Base *mmsg){
 }
 
 
-bool Node::correctErrors(MyMessage_Base *mmsg){
+void Node::correctErrors(MyMessage_Base *mmsg){
     std::string msg = mmsg->getM_Payload();
     int n = msg.length();
     int r = ceil(log2(n+1));
@@ -416,5 +424,13 @@ bool Node::correctErrors(MyMessage_Base *mmsg){
 
     correctedMsg = characterize(correctedMsg);
     mmsg->setM_Payload(correctedMsg.c_str());
+}
+
+void Node::printStatistics(){
+    std::cout<<"Number of generated frames: " << generated_frames << endl;
+    std::cout<<"Number of dropped frames: " << dropped_frames << endl;
+    std::cout<<"Number of retransmitted frames: " << retransmitted_frames << endl;
+    std::cout<<"Number of duplicated frames: " << duplicated_frames << endl;
+    std::cout<<"percentage of useful data: " << (double(useful_frames)/ double(generated_frames))*100 << endl;
 }
 

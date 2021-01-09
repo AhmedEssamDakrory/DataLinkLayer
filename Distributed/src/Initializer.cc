@@ -28,6 +28,11 @@ void Initializer::initialize()
 
 void Initializer::handleMessage(cMessage *msg)
 {
+    // end time.
+    if(simTime() >= par("end_time")){
+        return;
+    }
+
     if(msg->isSelfMessage()){
         generateRandomPairs();
         // TODO: schedule self message after 30 seconds.

@@ -22,6 +22,7 @@ simple Initializer
 {
     parameters:
         double timeStep = default(30);
+        double end_time = default(180);
     gates:
         output outs[];
 }
