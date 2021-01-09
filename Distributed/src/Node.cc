@@ -17,8 +17,26 @@
 #include <fstream>
 Define_Module(Node);
 
+
+int Node::dropped_frames = 0;
+int Node::generated_frames = 0;
+int Node::retransmitted_frames = 0;
+
 void Node::initialize()
 {
+    std::string myText;
+
+    // Read from the text file
+    std::ifstream MyReadFile("file.txt");
+
+    // Use a while loop together with the getline() function to read the file line by line
+    while (getline (MyReadFile, myText)) {
+      // Output the text from the file
+        msgs.push_back(myText);
+    }
+
+    // Close the file
+    MyReadFile.close();
 }
 
 
@@ -68,8 +86,11 @@ void Node::initGoBackN()
 const char* Node::fromNetworkLayer()
 {
     //TODO: return random message
-    const char* message = "hello $//there//";
-    return  message;
+    int no = getIndex();
+    sent_frames++;
+    return msgs[(no+sent_frames)%msgs.size()].c_str();
+//    const char* message = "hello $//there//";
+//    return  message;
 }
 
 
@@ -105,7 +126,7 @@ void Node::sendData()
     // Frame with Byte Stuffing.
     frameWithByteStuffing(mmsg);
     // TODO: Hamming
-    addHamming(mmsg);
+//    addHamming(mmsg);
     toPhysicalLayer(mmsg);
     EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << " and payload = " << mmsg->getM_Payload() << endl;
     startTimer(next_frame_to_send);
@@ -146,7 +167,7 @@ void Node::startGoBackN(MyMessage_Base* msg)
             // from physical layer
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
-                correctErrors(msg);
+//                correctErrors(msg);
                 char* message = unframe(msg);
                 EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck() << " and payload = " << message << endl;
             } else {
@@ -324,12 +345,12 @@ std::string Node::binarize(std::string s) {
 
 std::string Node::characterize(std::string s) {
     std::string out = "";
-    std::cout << s << endl;
+//    std::cout << s << endl;
     for(int i=0;i<s.length()/8;i++) {
-        std::cout << s.substr(i*8, 8) << " ";
+//        std::cout << s.substr(i*8, 8) << " ";
         out += static_cast<char>(std::bitset<8>(s.substr(i*8, 8)).to_ulong());
     }
-    std::cout << endl;
+//    std::cout << endl;
     return out;
 }
 
@@ -382,8 +403,8 @@ bool Node::correctErrors(MyMessage_Base *mmsg){
             error |= (int)pow(2, i);
         }
     }
-    std::cout << "error detected at " << error << endl;
     if(error) {
+        std::cout << "error detected at " << error << endl;
         int e = msg[error-1] - '0';
         if(e) msg[error-1] = '0';
         else msg[error-1] = '1';

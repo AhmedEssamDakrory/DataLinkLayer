@@ -20,6 +20,7 @@
 #include "MyMessage_m.h"
 #include <bitset>
 #include <string>
+#include <vector>
 using namespace omnetpp;
 
 enum Events{
@@ -35,15 +36,24 @@ enum Events{
 class Node : public cSimpleModule
 {
   protected:
+
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
     void frameWithByteStuffing(MyMessage_Base* mmsg);
     char* unframe(MyMessage_Base* mmsg);
+
+    // hamming error correction
     bool correctErrors(MyMessage_Base *mmsg);
     void addHamming(MyMessage_Base *mmsg);
     bool isPowerOfTwo(int x);
     std::string binarize(std::string s);
     std::string characterize(std::string s);
+
+    // statistics
+    static int generated_frames;
+    static int dropped_frames;
+    static int retransmitted_frames;
+
 
     // GoBackN protocol parameters
     int dest;
@@ -57,6 +67,8 @@ class Node : public cSimpleModule
     bool* isTimerSet;
     omnetpp::simtime_t  lastResetTime;
 
+    std::vector<std::string> msgs;
+    int sent_frames = 0;
 
     void initGoBackN();
     void startGoBackN(MyMessage_Base* msg);
