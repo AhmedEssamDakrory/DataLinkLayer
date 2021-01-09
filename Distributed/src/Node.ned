@@ -22,7 +22,7 @@ simple Node
 {
     parameters:
         double lambda = default(2.0);
-        double timeout_period = default(5);
+        double timeout_period = default(7);
         int m = default(2); // number of bits needed for the sequence number.  
         
         //framing parameters 
@@ -49,6 +49,8 @@ simple Node
         
         double delay_duration_min = default(0.0);
         double delay_duration_max = default(1.0);
+        
+        double end_time = default(180);
         
     gates:
         input fromInitializer;

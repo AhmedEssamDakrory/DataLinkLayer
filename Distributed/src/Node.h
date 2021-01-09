@@ -43,7 +43,7 @@ class Node : public cSimpleModule
     char* unframe(MyMessage_Base* mmsg);
 
     // hamming error correction
-    bool correctErrors(MyMessage_Base *mmsg);
+    void correctErrors(MyMessage_Base *mmsg);
     void addHamming(MyMessage_Base *mmsg);
     bool isPowerOfTwo(int x);
     std::string binarize(std::string s);
@@ -51,8 +51,11 @@ class Node : public cSimpleModule
 
     // statistics
     static int generated_frames;
+    static int duplicated_frames;
     static int dropped_frames;
     static int retransmitted_frames;
+    static int useful_frames;
+    static bool printed;
 
 
     // GoBackN protocol parameters
@@ -72,16 +75,17 @@ class Node : public cSimpleModule
 
     void initGoBackN();
     void startGoBackN(MyMessage_Base* msg);
-    void sendData();
+    void sendData(bool retransmitted);
     const char* fromNetworkLayer();
     void enableNetworkLayer();
     int inc(int seq_num);
     bool between(int a, int b, int c);
     void startTimer(int seq_num);
     void stopTimer(int seq_num);
+    void printStatistics();
 
     //channel effect handling methods
-    void toPhysicalLayer(MyMessage_Base* msg);
+    void toPhysicalLayer(MyMessage_Base* msg, bool retransmitted);
     void modificationEffect(MyMessage_Base* msg);
     bool duplicateEffect(MyMessage_Base* msg);
     void delaysEffect(MyMessage_Base* msg);
