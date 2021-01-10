@@ -71,6 +71,7 @@ class Node : public cSimpleModule
     omnetpp::simtime_t  lastResetTime;
 
     std::vector<std::string> msgs;
+    int msgs_count;
     int sent_frames = 0;
 
     void initGoBackN();

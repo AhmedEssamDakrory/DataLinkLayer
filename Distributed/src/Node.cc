@@ -27,19 +27,26 @@ bool Node::printed = false;
 
 void Node::initialize()
 {
-    std::string myText;
 
     // Read from the text file
-    std::ifstream MyReadFile("file.txt");
+//    std::string filename = "node" + std::to_string(getIndex()+1) + ".txt";
+    std::string filename = "file.txt";
+    std::ifstream MyReadFile(filename);
+    EV << "Reading messages from " << filename << endl;
 
     // Use a while loop together with the getline() function to read the file line by line
+    std::string myText;
     while (getline (MyReadFile, myText)) {
-      // Output the text from the file
         msgs.push_back(myText);
     }
+    msgs_count = msgs.size();
+
+    EV << msgs_count << " Messages read successfully" << endl;
 
     // Close the file
     MyReadFile.close();
+
+    sent_frames = 0;
 }
 
 
@@ -95,12 +102,9 @@ void Node::initGoBackN()
 
 const char* Node::fromNetworkLayer()
 {
-    //TODO: return random message
-    int no = getIndex();
-    sent_frames++;
-    return msgs[(no+sent_frames)%msgs.size()].c_str();
-//    const char* message = "hello $//there//";
-//    return  message;
+    int idx = sent_frames++%int(msgs_count);
+    const char* msg = msgs[idx].c_str();
+    return msg;
 }
 
 
@@ -136,8 +140,10 @@ void Node::sendData(bool retransmitted)
     // Frame with Byte Stuffing.
     EV<<"Network layer of Node"<<getIndex() <<" is ready and sent frame with seq_num = "<< next_frame_to_send << " and payload = " << mmsg->getM_Payload() << endl;
     frameWithByteStuffing(mmsg);
-    // TODO: Hamming
+    EV << "Payload after framing: " << mmsg->getM_Payload() << endl;
+    // Hamming
     addHamming(mmsg);
+    EV << "Payload after hamming code: " << mmsg ->getM_Payload() << endl;
     toPhysicalLayer(mmsg, retransmitted);
     startTimer(next_frame_to_send);
 }
@@ -177,9 +183,11 @@ void Node::startGoBackN(MyMessage_Base* msg)
             // from physical layer
             if(msg->getSeq_Num() == frame_expected){
                 frame_expected = inc(frame_expected);
+                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck() << " and payload = " << msg->getM_Payload() << endl;
                 correctErrors(msg);
+                EV<<"Payload after error correction and removal of hamming codes: " << msg->getM_Payload() << endl;
                 char* message = unframe(msg);
-                EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and Ack = " << msg->getAck() << " and payload = " << message << endl;
+                EV<<"Payload after removal of framing (original message): " << message << endl;
             } else {
                 EV<<"Node " << getIndex() << " just received a message with seq_num = " << msg->getSeq_Num() << " and discarded it!"<<endl;
 
@@ -294,8 +302,12 @@ void Node::modificationEffect(MyMessage_Base* msg){
         char* m_msg = new char[n];
         std::strcpy(m_msg, old_msg);
 
-        if(m_msg[position_char]=='1') m_msg[position_char]='0';
-        else m_msg[position_char]='1';
+        std::bitset<8> bits(m_msg[position_char]);
+
+        int position_bit = uniform(0, 8);
+        bits[position_bit] = ~ bits[position_bit];
+
+        m_msg[position_char] = (char) bits.to_ulong();
 
         EV<<"char in position " << position_char << " changed from " << old_msg[position_char] << " to " << m_msg[position_char] << endl;
         msg->setM_Payload(m_msg);
@@ -356,6 +368,9 @@ std::string Node::binarize(std::string s) {
 
 std::string Node::characterize(std::string s) {
     std::string out = "";
+    while(s.length()%8!=0){
+        s+='0';
+    }
     for(int i=0;i<int(s.length()/8);i++) {
         out += static_cast<char>(std::bitset<8>(s.substr(i*8, 8)).to_ulong());
     }
@@ -389,15 +404,17 @@ void Node::addHamming(MyMessage_Base *mmsg){
         }
         outputMsg[pow(2, i)-1] = p+48;
     }
-
+    outputMsg = characterize(outputMsg);
     mmsg->setM_Payload(outputMsg.c_str());
 }
 
 
 void Node::correctErrors(MyMessage_Base *mmsg){
     std::string msg = mmsg->getM_Payload();
-    int n = msg.length();
-    int r = ceil(log2(n+1));
+    int n = msg.length()*8;
+    int r = ceil(log2(n));
+    int m = ((n-r)/8)*8;
+    msg = binarize(msg).substr(0, m+r);
 
     int error = 0;
     for(int i=0; i<r; i++) {
@@ -412,13 +429,13 @@ void Node::correctErrors(MyMessage_Base *mmsg){
         }
     }
     if(error) {
-        std::cout << "error detected at " << error << endl;
+        EV << "Node " << getIndex() << ": An Error was detected and corrected at bit #" << error << endl;
         int e = msg[error-1] - '0';
         if(e) msg[error-1] = '0';
         else msg[error-1] = '1';
     }
     std::string correctedMsg = "";
-    for(int i=1; i<=n; i++) {
+    for(int i=1; i<=m+r; i++) {
         if(!isPowerOfTwo(i)) correctedMsg+=msg[i-1];
     }
 
