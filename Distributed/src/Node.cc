@@ -113,6 +113,7 @@ void Node::startTimer(int seq_num)
     MyMessage_Base * mmsg = new MyMessage_Base("");
     mmsg->setM_Type(Timeout);
     mmsg->setSeq_Num(seq_num);
+    mmsg->setTimestamp();
     scheduleAt(simTime() + par("timeout_period"), mmsg);
     if(isTimerSet[seq_num]){
         stopTimer(seq_num);
